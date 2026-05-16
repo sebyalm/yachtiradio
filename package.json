@@ -1,0 +1,16 @@
+{
+  "name": "yachtie-radio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LAN push-to-talk radio MVP for yacht crew.",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "build": "node scripts/check-static.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
+

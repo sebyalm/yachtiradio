@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Yachtie Radio">
+  <rect width="128" height="128" rx="24" fill="#f7f7f2"/>
+  <path d="M28 82c13 12 58 12 72 0" fill="none" stroke="#006d6f" stroke-width="10" stroke-linecap="round"/>
+  <path d="M64 21v60" stroke="#172026" stroke-width="9" stroke-linecap="round"/>
+  <path d="M64 29 35 75h29z" fill="#d8992b"/>
+  <path d="M64 29v46h31z" fill="#006d6f"/>
+  <circle cx="64" cy="92" r="9" fill="#c6473a"/>
+</svg>
+
