@@ -240,7 +240,7 @@ function createApp({ publicDir = PUBLIC_DIR } = {}) {
 
       const ext = path.extname(filePath).toLowerCase();
       res.writeHead(200, {
-        "cache-control": ext === ".html" ? "no-cache" : "public, max-age=3600",
+        "cache-control": "no-cache",
         "content-type": MIME_TYPES.get(ext) || "application/octet-stream"
       });
       fs.createReadStream(filePath).pipe(res);

@@ -44,6 +44,10 @@ test("serves the app shell and health endpoint", async (t) => {
   const health = await fetch(`${baseUrl}/api/health`);
   assert.equal(health.status, 200);
   assert.deepEqual(await health.json(), { ok: true, rooms: [] });
+
+  const appScript = await fetch(`${baseUrl}/app.js?v=test`);
+  assert.equal(appScript.status, 200);
+  assert.equal(appScript.headers.get("cache-control"), "no-cache");
 });
 
 test("validates malformed signal messages", async (t) => {
@@ -88,4 +92,3 @@ test("broadcasts talking signals to room peers", async (t) => {
   assert.match(received, /"from":"alpha"/);
   assert.match(received, /"talking":true/);
 });
-

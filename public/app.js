@@ -22,6 +22,7 @@
     eventSource: null,
     joined: false,
     localStream: null,
+    microphonePromise: null,
     name: localStorage.getItem("yachtie-radio-name") || "",
     peers: new Map(),
     remoteTalking: new Map(),
@@ -80,7 +81,6 @@
     localStorage.setItem("yachtie-radio-room", state.room);
 
     try {
-      await prepareMicrophone();
       connectEvents();
       state.joined = true;
       addLog(`Joined #${state.room} as ${state.name}`);
@@ -95,14 +95,25 @@
 
   async function prepareMicrophone() {
     if (state.localStream) {
-      return;
+      return state.localStream;
+    }
+
+    if (state.microphonePromise) {
+      return state.microphonePromise;
     }
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       throw new Error("Microphone access needs HTTPS on LAN or localhost during development.");
     }
 
-    const stream = await navigator.mediaDevices.getUserMedia({
+    let timeoutId = 0;
+    const timeout = new Promise((resolve, reject) => {
+      timeoutId = window.setTimeout(() => {
+        reject(new Error("Microphone permission is still waiting. Check the browser permission prompt."));
+      }, 10000);
+    });
+
+    const microphone = navigator.mediaDevices.getUserMedia({
       audio: {
         autoGainControl: true,
         channelCount: 1,
@@ -110,12 +121,23 @@
         noiseSuppression: true
       },
       video: false
+    }).then((stream) => {
+      for (const track of stream.getAudioTracks()) {
+        track.enabled = false;
+      }
+      state.localStream = stream;
+      addLog("Microphone ready");
+      return stream;
     });
 
-    for (const track of stream.getAudioTracks()) {
-      track.enabled = false;
-    }
-    state.localStream = stream;
+    state.microphonePromise = Promise.race([microphone, timeout]).finally(() => {
+      window.clearTimeout(timeoutId);
+      state.microphonePromise = null;
+      render();
+    });
+
+    render();
+    return state.microphonePromise;
   }
 
   function connectEvents() {
@@ -192,6 +214,8 @@
 
     slot = {
       audio: null,
+      audioSender: null,
+      audioTransceiver: null,
       candidates: [],
       id: peer.id,
       name: peer.name || "Crew",
@@ -199,9 +223,14 @@
     };
     state.peers.set(peer.id, slot);
 
-    for (const track of state.localStream.getAudioTracks()) {
-      pc.addTrack(track, state.localStream);
+    if (pc.addTransceiver) {
+      const transceiver = pc.addTransceiver("audio", { direction: "sendrecv" });
+      slot.audioSender = transceiver.sender;
+      slot.audioTransceiver = transceiver;
+    } else if (state.localStream && pc.addTrack) {
+      slot.audioSender = pc.addTrack(state.localStream.getAudioTracks()[0], state.localStream);
     }
+    await syncLocalAudioTrack(slot);
 
     pc.addEventListener("icecandidate", (event) => {
       if (event.candidate) {
@@ -288,6 +317,8 @@
 
     state.peers.set(peer.id, {
       audio: null,
+      audioSender: null,
+      audioTransceiver: null,
       candidates: [],
       id: peer.id,
       name: peer.name || "Crew",
@@ -323,15 +354,22 @@
     audio.play().catch(() => addLog("Tap Join again if audio stays muted."));
   }
 
-  function beginTransmit(event) {
+  async function beginTransmit(event) {
     if (event) {
       event.preventDefault();
     }
-    if (!state.joined || state.transmitting) {
+    if (!state.joined || state.transmitting || state.microphonePromise) {
       return;
     }
 
-    setTransmit(true);
+    try {
+      await prepareMicrophone();
+      await syncLocalAudioTrack();
+      setTransmit(true);
+    } catch (error) {
+      addLog(error.message || "Microphone is not available.");
+      render();
+    }
   }
 
   function endTransmit(event) {
@@ -357,6 +395,29 @@
     }
     sendSignal("talking", "", { talking: enabled });
     render();
+  }
+
+  async function syncLocalAudioTrack(targetSlot) {
+    if (!state.localStream) {
+      return;
+    }
+
+    const [audioTrack] = state.localStream.getAudioTracks();
+    if (!audioTrack) {
+      return;
+    }
+
+    const slots = targetSlot ? [targetSlot] : Array.from(state.peers.values());
+    await Promise.all(slots.map(async (slot) => {
+      if (slot.audioSender && slot.audioSender.replaceTrack) {
+        await slot.audioSender.replaceTrack(audioTrack);
+        return;
+      }
+
+      if (slot.pc && slot.pc.addTrack) {
+        slot.audioSender = slot.pc.addTrack(audioTrack, state.localStream);
+      }
+    }));
   }
 
   async function sendSignal(type, to, payload) {
@@ -401,6 +462,7 @@
     state.peers.clear();
     state.remoteTalking.clear();
     state.joined = false;
+    state.microphonePromise = null;
 
     if (state.localStream) {
       for (const track of state.localStream.getTracks()) {
@@ -447,6 +509,9 @@
     } else if (state.transmitting) {
       elements.statusText.textContent = "On Air";
       elements.signalPill.textContent = "TX";
+    } else if (state.microphonePromise) {
+      elements.statusText.textContent = "Allow microphone";
+      elements.signalPill.textContent = "Mic";
     } else if (remoteTalkers.length > 0) {
       elements.statusText.textContent = `${remoteTalkers[0].name} is speaking`;
       elements.signalPill.textContent = "RX";
