@@ -86,7 +86,7 @@ function createElement(tagName = "div") {
   return element;
 }
 
-function createHarness({ getUserMedia }) {
+function createHarness({ fetch, getUserMedia }) {
   const ids = [
     "eventLog",
     "joinButton",
@@ -134,7 +134,7 @@ function createHarness({ getUserMedia }) {
         return elements[id];
       }
     },
-    fetch: () => Promise.resolve({ ok: true }),
+    fetch: fetch || (() => Promise.resolve({ ok: true })),
     localStorage: storage(),
     navigator: {
       mediaDevices: {
@@ -145,9 +145,11 @@ function createHarness({ getUserMedia }) {
     URL,
     window: {
       addEventListener() {},
+      clearTimeout,
       location: {
         origin: "http://localhost:3000"
-      }
+      },
+      setTimeout
     }
   };
   context.globalThis = context;
@@ -175,3 +177,55 @@ test("join enters the channel even when microphone permission stalls", async () 
   assert.equal(elements.leaveButton.disabled, false);
 });
 
+test("holding talk reports microphone failures instead of falling back to listening", async () => {
+  const error = new Error("Permission denied");
+  error.name = "NotAllowedError";
+  const { elements } = createHarness({
+    getUserMedia: () => Promise.reject(error)
+  });
+
+  elements.nameInput.value = "Alice";
+  elements.roomInput.value = "Deck";
+  await elements.joinButton.listeners.get("click")();
+  await elements.talkButton.listeners.get("pointerdown")({
+    currentTarget: elements.talkButton,
+    pointerId: 1,
+    preventDefault() {}
+  });
+
+  assert.match(elements.statusText.textContent, /Microphone is blocked/);
+  assert.equal(elements.talkButtonText.textContent, "Try Talk Again");
+});
+
+test("holding talk enables the microphone track and sends a talking signal", async () => {
+  const track = { enabled: true, stop() {} };
+  const fetchCalls = [];
+  const { elements } = createHarness({
+    fetch: (url, options) => {
+      fetchCalls.push({ url, options });
+      return Promise.resolve({ ok: true });
+    },
+    getUserMedia: () => Promise.resolve({
+      getAudioTracks: () => [track],
+      getTracks: () => [track]
+    })
+  });
+
+  elements.nameInput.value = "Alice";
+  elements.roomInput.value = "Deck";
+  await elements.joinButton.listeners.get("click")();
+  await elements.talkButton.listeners.get("pointerdown")({
+    currentTarget: elements.talkButton,
+    pointerId: 1,
+    preventDefault() {}
+  });
+
+  assert.equal(elements.statusText.textContent, "On Air");
+  assert.equal(elements.talkButtonText.textContent, "Transmitting");
+  assert.equal(track.enabled, true);
+
+  const talkingSignal = fetchCalls
+    .map((call) => JSON.parse(call.options.body))
+    .find((body) => body.type === "talking" && body.payload.talking);
+  assert.ok(talkingSignal);
+});

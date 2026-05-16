@@ -22,9 +22,11 @@
     eventSource: null,
     joined: false,
     localStream: null,
+    micError: "",
     microphonePromise: null,
     name: localStorage.getItem("yachtie-radio-name") || "",
     peers: new Map(),
+    pressActive: false,
     remoteTalking: new Map(),
     room: localStorage.getItem("yachtie-radio-room") || "deck",
     transmitting: false
@@ -39,6 +41,9 @@
   elements.talkButton.addEventListener("pointerup", endTransmit);
   elements.talkButton.addEventListener("pointercancel", endTransmit);
   elements.talkButton.addEventListener("pointerleave", endTransmit);
+  elements.talkButton.addEventListener("mousedown", beginTransmit);
+  elements.talkButton.addEventListener("mouseup", endTransmit);
+  elements.talkButton.addEventListener("mouseleave", endTransmit);
   elements.talkButton.addEventListener("touchstart", beginTransmit, { passive: false });
   elements.talkButton.addEventListener("touchend", endTransmit);
   elements.talkButton.addEventListener("keydown", (event) => {
@@ -357,17 +362,34 @@
   async function beginTransmit(event) {
     if (event) {
       event.preventDefault();
+      if (event.pointerId !== undefined && event.currentTarget && event.currentTarget.setPointerCapture) {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }
     }
-    if (!state.joined || state.transmitting || state.microphonePromise) {
+
+    if (!state.joined || state.transmitting) {
+      return;
+    }
+
+    state.pressActive = true;
+    state.micError = "";
+    render();
+
+    if (state.microphonePromise) {
       return;
     }
 
     try {
       await prepareMicrophone();
+      if (!state.pressActive || !state.joined) {
+        return;
+      }
       await syncLocalAudioTrack();
       setTransmit(true);
     } catch (error) {
-      addLog(error.message || "Microphone is not available.");
+      state.pressActive = false;
+      state.micError = friendlyMicError(error);
+      addLog(state.micError);
       render();
     }
   }
@@ -375,8 +397,13 @@
   function endTransmit(event) {
     if (event) {
       event.preventDefault();
+      if (event.pointerId !== undefined && event.currentTarget && event.currentTarget.releasePointerCapture) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
     }
+    state.pressActive = false;
     stopTransmit();
+    render();
   }
 
   function stopTransmit() {
@@ -395,6 +422,22 @@
     }
     sendSignal("talking", "", { talking: enabled });
     render();
+  }
+
+  function friendlyMicError(error) {
+    if (!error) {
+      return "Microphone is not available.";
+    }
+
+    if (error.name === "NotAllowedError" || error.name === "SecurityError") {
+      return "Microphone is blocked. Allow mic access in the browser.";
+    }
+
+    if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
+      return "No microphone was found on this device.";
+    }
+
+    return error.message || "Microphone is not available.";
   }
 
   async function syncLocalAudioTrack(targetSlot) {
@@ -462,7 +505,9 @@
     state.peers.clear();
     state.remoteTalking.clear();
     state.joined = false;
+    state.micError = "";
     state.microphonePromise = null;
+    state.pressActive = false;
 
     if (state.localStream) {
       for (const track of state.localStream.getTracks()) {
@@ -497,7 +542,13 @@
     elements.talkButton.classList.toggle("is-transmitting", state.transmitting);
     elements.talkButton.disabled = !state.joined;
     elements.talkButton.setAttribute("aria-pressed", String(state.transmitting));
-    elements.talkButtonText.textContent = state.transmitting ? "Transmitting" : "Hold to Talk";
+    elements.talkButtonText.textContent = state.transmitting
+      ? "Transmitting"
+      : state.pressActive
+        ? "Starting Mic"
+        : state.micError
+          ? "Try Talk Again"
+          : "Hold to Talk";
     elements.joinButton.disabled = state.joined;
     elements.leaveButton.disabled = !state.joined;
     elements.nameInput.disabled = state.joined;
@@ -509,8 +560,14 @@
     } else if (state.transmitting) {
       elements.statusText.textContent = "On Air";
       elements.signalPill.textContent = "TX";
+    } else if (state.micError) {
+      elements.statusText.textContent = state.micError;
+      elements.signalPill.textContent = "Mic";
     } else if (state.microphonePromise) {
       elements.statusText.textContent = "Allow microphone";
+      elements.signalPill.textContent = "Mic";
+    } else if (state.pressActive) {
+      elements.statusText.textContent = "Starting microphone";
       elements.signalPill.textContent = "Mic";
     } else if (remoteTalkers.length > 0) {
       elements.statusText.textContent = `${remoteTalkers[0].name} is speaking`;
