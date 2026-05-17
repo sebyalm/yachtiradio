@@ -10,6 +10,7 @@
   --red: #c6473a;
   --green: #22845c;
   --white: #ffffff;
+  --tap-size: 52px;
   --shadow: 0 18px 50px rgba(23, 32, 38, 0.12);
 }
 
@@ -19,10 +20,11 @@
 
 html {
   min-height: 100%;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  min-height: 100%;
+  min-height: 100dvh;
   margin: 0;
   background:
     linear-gradient(180deg, rgba(0, 109, 111, 0.08), rgba(216, 153, 43, 0.06) 46%, transparent 78%),
@@ -30,6 +32,7 @@ body {
   color: var(--ink);
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   letter-spacing: 0;
+  overscroll-behavior-y: contain;
 }
 
 button,
@@ -38,18 +41,31 @@ input {
   letter-spacing: 0;
 }
 
+button {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+input {
+  font-size: 1rem;
+}
+
 .shell {
   width: min(100%, 980px);
   min-height: 100dvh;
   margin: 0 auto;
-  padding: max(18px, env(safe-area-inset-top)) 18px max(24px, env(safe-area-inset-bottom));
+  padding:
+    calc(12px + env(safe-area-inset-top))
+    max(18px, env(safe-area-inset-right))
+    calc(18px + env(safe-area-inset-bottom))
+    max(18px, env(safe-area-inset-left));
   display: grid;
-  grid-template-rows: auto auto 1fr auto auto;
-  gap: 16px;
+  grid-template-rows: auto auto minmax(330px, 1fr) auto auto;
+  gap: clamp(12px, 2.4vw, 16px);
 }
 
 .masthead {
-  min-height: 82px;
+  min-height: clamp(64px, 10dvh, 82px);
   display: flex;
   align-items: center;
   gap: 14px;
@@ -90,7 +106,7 @@ h2 {
 
 .control-band {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(160px, 1fr) minmax(140px, 0.8fr) minmax(86px, auto) minmax(86px, auto);
   gap: 10px;
   align-items: end;
   padding-bottom: 4px;
@@ -104,7 +120,7 @@ h2 {
 
 .field input {
   width: 100%;
-  height: 46px;
+  height: var(--tap-size);
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.82);
@@ -120,13 +136,23 @@ h2 {
 
 .button {
   min-width: 86px;
-  height: 46px;
+  min-height: var(--tap-size);
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--white);
   color: var(--ink);
   font-weight: 800;
   cursor: pointer;
+}
+
+.button:focus-visible,
+.talk-button:focus-visible {
+  outline: 3px solid rgba(216, 153, 43, 0.72);
+  outline-offset: 4px;
+}
+
+.button:not(:disabled):active {
+  transform: translateY(1px);
 }
 
 .button:disabled,
@@ -167,12 +193,18 @@ h2 {
   gap: 14px;
 }
 
+.status-row > div:first-child,
+.section-heading h2 {
+  min-width: 0;
+}
+
 .status-text {
   margin: 5px 0 0;
   color: var(--ink);
   font-size: clamp(1.15rem, 3vw, 1.7rem);
   font-weight: 850;
   line-height: 1.1;
+  overflow-wrap: anywhere;
 }
 
 .signal-pill {
@@ -186,13 +218,12 @@ h2 {
   place-items: center;
   font-size: 0.78rem;
   font-weight: 900;
+  flex: 0 0 auto;
 }
 
 .talk-button {
-  width: min(100%, 470px);
+  width: clamp(220px, min(76vw, 52dvh), 470px);
   aspect-ratio: 1 / 1;
-  max-height: 470px;
-  min-height: 230px;
   justify-self: center;
   align-self: center;
   border: 0;
@@ -215,6 +246,11 @@ h2 {
   text-align: center;
   touch-action: none;
   user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.talk-button:not(:disabled):active {
+  transform: scale(0.985);
 }
 
 .talk-button.is-transmitting {
@@ -333,6 +369,7 @@ h2 {
   color: var(--muted);
   font-size: 0.88rem;
   line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .remote-audio {
@@ -341,12 +378,23 @@ h2 {
 
 @media (max-width: 680px) {
   .shell {
-    padding-inline: 14px;
-    gap: 13px;
+    padding:
+      calc(10px + env(safe-area-inset-top))
+      max(14px, env(safe-area-inset-right))
+      calc(14px + env(safe-area-inset-bottom))
+      max(14px, env(safe-area-inset-left));
+    gap: 11px;
+    grid-template-rows: auto auto auto auto auto;
+  }
+
+  h1 {
+    font-size: clamp(1.85rem, 9vw, 2.6rem);
   }
 
   .control-band {
     grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+    gap: 9px;
   }
 
   .button {
@@ -354,26 +402,157 @@ h2 {
   }
 
   .radio-face {
-    min-height: 48dvh;
+    min-height: 0;
+    padding: clamp(14px, 4.8vw, 22px);
+    gap: clamp(12px, 3.8vw, 18px);
+  }
+
+  .talk-button {
+    width: clamp(220px, min(76vw, 46dvh), 370px);
+    font-size: clamp(1.25rem, 8vw, 2.1rem);
+    gap: 12px;
+  }
+
+  .meter {
+    height: 44px;
+    gap: 6px;
+  }
+
+  .event-log {
+    max-height: 96px;
   }
 }
 
 @media (max-width: 430px) {
-  .control-band {
-    grid-template-columns: 1fr;
-  }
-
   .masthead {
-    min-height: 70px;
+    min-height: 60px;
+    gap: 11px;
   }
 
   .brand-mark {
-    width: 46px;
-    height: 46px;
+    width: 44px;
+    height: 44px;
   }
 
-  .talk-button {
-    min-height: 210px;
+  .eyebrow,
+  .label,
+  .field span,
+  .section-heading span {
+    font-size: 0.7rem;
   }
 }
 
+@media (max-width: 680px) and (max-height: 720px) {
+  .shell {
+    gap: 9px;
+  }
+
+  .masthead {
+    min-height: 54px;
+  }
+
+  .brand-mark {
+    width: 40px;
+    height: 40px;
+  }
+
+  .field input,
+  .button {
+    min-height: 48px;
+    height: 48px;
+  }
+
+  .radio-face {
+    padding: 14px;
+    gap: 10px;
+  }
+
+  .talk-button {
+    width: clamp(200px, min(70vw, 42dvh), 320px);
+  }
+
+  .meter {
+    height: 34px;
+  }
+}
+
+@media (max-width: 920px) and (orientation: landscape) and (max-height: 540px) {
+  .shell {
+    width: 100%;
+    grid-template-columns: minmax(220px, 0.9fr) minmax(260px, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    align-items: start;
+    column-gap: 12px;
+    row-gap: 9px;
+  }
+
+  .masthead {
+    grid-column: 1;
+    min-height: 48px;
+  }
+
+  h1 {
+    font-size: 1.55rem;
+  }
+
+  .control-band {
+    grid-column: 1;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .radio-face {
+    grid-column: 2;
+    grid-row: 1 / span 4;
+    align-self: start;
+    min-height: 0;
+    height: calc(100dvh - 20px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    padding: 14px;
+    gap: 10px;
+  }
+
+  .talk-button {
+    width: clamp(170px, 50dvh, 220px);
+    font-size: clamp(1.05rem, 5dvh, 1.6rem);
+    gap: 8px;
+  }
+
+  .tx-light {
+    width: 14px;
+    height: 14px;
+  }
+
+  .meter {
+    height: 24px;
+  }
+
+  .crew-band,
+  .log-band {
+    grid-column: 1;
+    min-height: 0;
+  }
+
+  .peer-list {
+    min-height: 0;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .peer-card {
+    min-height: 52px;
+    padding: 10px;
+  }
+
+  .event-log {
+    max-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
