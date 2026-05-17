@@ -29,6 +29,7 @@
     pressActive: false,
     remoteTalking: new Map(),
     room: localStorage.getItem("yachtie-radio-room") || "deck",
+    signalError: "",
     transmitting: false
   };
 
@@ -82,6 +83,7 @@
     setBusy(true);
     state.name = normalizeInput(elements.nameInput.value, "Crew");
     state.room = normalizeInput(elements.roomInput.value, "deck").toLowerCase();
+    state.signalError = "";
     localStorage.setItem("yachtie-radio-name", state.name);
     localStorage.setItem("yachtie-radio-room", state.room);
 
@@ -156,6 +158,7 @@
 
     events.addEventListener("ready", (event) => {
       const message = JSON.parse(event.data);
+      state.signalError = "";
       state.room = message.room;
       addLog(`Channel ready: #${state.room}`);
       render();
@@ -195,7 +198,8 @@
 
     events.onerror = () => {
       if (state.joined) {
-        addLog("Signal link interrupted; retrying.");
+        state.signalError = "Signal server unavailable";
+        addLog("Signal server unavailable. Use the local LAN server for radio mode.");
       }
       render();
     };
@@ -540,7 +544,7 @@
 
     elements.body.classList.toggle("is-live", state.transmitting || remoteTalkers.length > 0);
     elements.talkButton.classList.toggle("is-transmitting", state.transmitting);
-    elements.talkButton.disabled = !state.joined;
+    elements.talkButton.disabled = !state.joined || Boolean(state.signalError);
     elements.talkButton.setAttribute("aria-pressed", String(state.transmitting));
     elements.talkButtonText.textContent = state.transmitting
       ? "Transmitting"
@@ -560,6 +564,9 @@
     } else if (state.transmitting) {
       elements.statusText.textContent = "On Air";
       elements.signalPill.textContent = "TX";
+    } else if (state.signalError) {
+      elements.statusText.textContent = state.signalError;
+      elements.signalPill.textContent = "Offline";
     } else if (state.micError) {
       elements.statusText.textContent = state.micError;
       elements.signalPill.textContent = "Mic";

@@ -36,7 +36,10 @@ Then open `https://<host-lan-ip>:3000`.
 - Crew presence, receive/transmit state, and connection status.
 - Mobile-first PWA metadata for iPhone home-screen use.
 
+## Vercel Hosting
+
+Vercel can host the static web UI, but it cannot replace the onboard LAN signaling server. The deployed Vercel URL is useful as a preview that the app shell loads. For actual radio behavior, run `npm start` on a computer connected to the yacht Wi-Fi and open that LAN address from crew devices.
+
 ## Reality Check
 
 "Zero latency" is not literally possible in browsers, but WebRTC on the same Wi-Fi network is the right low-latency path for this MVP. Apple Watch browser support for WebRTC microphone capture is limited, so the web MVP targets phones first; a watch-friendly version would likely need a native companion app.
-

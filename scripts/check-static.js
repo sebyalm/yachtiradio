@@ -19,6 +19,14 @@ if (!manifest.name || !manifest.start_url || !Array.isArray(manifest.icons)) {
   throw new Error("Manifest is missing required app metadata.");
 }
 
+const vercelConfig = JSON.parse(fs.readFileSync(path.join(root, "vercel.json"), "utf8"));
+if (vercelConfig.outputDirectory !== "public" || vercelConfig.framework !== null) {
+  throw new Error("vercel.json must deploy the static public directory with no framework preset.");
+}
+if (vercelConfig.buildCommand !== "npm run build") {
+  throw new Error("vercel.json must run the static validation build.");
+}
+
 const index = fs.readFileSync(path.join(root, "public", "index.html"), "utf8");
 for (const asset of ["/styles.css", "/app.js", "/manifest.webmanifest"]) {
   if (!index.includes(asset)) {
@@ -27,4 +35,3 @@ for (const asset of ["/styles.css", "/app.js", "/manifest.webmanifest"]) {
 }
 
 console.log("Static checks passed.");
-
