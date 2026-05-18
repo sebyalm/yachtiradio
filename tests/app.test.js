@@ -100,7 +100,7 @@ function createHarness({ fetch, getUserMedia, healthOk = true, healthPayload }) 
     "peerCount",
     "peerList",
     "remoteAudio",
-    "roomInput",
+    "roomDisplay",
     "signalPill",
     "statusText",
     "talkButton",
@@ -197,7 +197,7 @@ async function flushAsync() {
   await new Promise((resolve) => setImmediate(resolve));
 }
 
-test("hosted preview blocks channel join until the local radio server is available", async () => {
+test("hosted preview blocks channel join until local Yachtie is available", async () => {
   const { elements, EventSourceMock } = createHarness({
     healthPayload: {
       error: "The hosted preview only serves the static app."
@@ -206,7 +206,8 @@ test("hosted preview blocks channel join until the local radio server is availab
   });
 
   await flushAsync();
-  assert.equal(elements.networkStatus.textContent, "Onboard radio server needed");
+  assert.equal(elements.networkStatus.textContent, "Hosted preview only");
+  assert.equal(elements.networkAddress.textContent, "No local address yet");
   assert.equal(elements.joinButton.disabled, true);
 
   elements.joinButton.listeners.get("click")();
@@ -220,13 +221,12 @@ test("join enters the channel even when microphone permission stalls", async () 
 
   await flushAsync();
   elements.nameInput.value = "Alice";
-  elements.roomInput.value = "Deck";
   elements.joinButton.listeners.get("click")();
   await new Promise((resolve) => setImmediate(resolve));
 
   assert.equal(EventSourceMock.instances.length, 1);
-  assert.match(EventSourceMock.instances[0].url.href, /room=deck/);
-  assert.equal(elements.statusText.textContent, "Listening on #deck");
+  assert.match(EventSourceMock.instances[0].url.href, /room=yacht/);
+  assert.equal(elements.statusText.textContent, "Listening on yacht channel");
   assert.equal(elements.joinButton.disabled, true);
   assert.equal(elements.leaveButton.disabled, false);
 });
@@ -240,7 +240,6 @@ test("holding talk reports microphone failures instead of falling back to listen
 
   await flushAsync();
   elements.nameInput.value = "Alice";
-  elements.roomInput.value = "Deck";
   await elements.joinButton.listeners.get("click")();
   await elements.talkButton.listeners.get("pointerdown")({
     currentTarget: elements.talkButton,
@@ -271,7 +270,6 @@ test("holding talk enables the microphone track and sends a talking signal", asy
 
   await flushAsync();
   elements.nameInput.value = "Alice";
-  elements.roomInput.value = "Deck";
   await elements.joinButton.listeners.get("click")();
   await elements.talkButton.listeners.get("pointerdown")({
     currentTarget: elements.talkButton,

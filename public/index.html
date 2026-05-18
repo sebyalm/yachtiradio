@@ -29,30 +29,30 @@
         <div class="network-copy">
           <p class="eyebrow">Wi-Fi First</p>
           <h2>Same yacht Wi-Fi</h2>
-          <p id="networkDetail" class="network-detail">Internet is optional. Crew devices just need this Wi-Fi and the local radio address.</p>
+          <p id="networkDetail" class="network-detail">Internet can be off. Join the yacht Wi-Fi, then open the local Yachtie address shown by the onboard device.</p>
         </div>
         <div id="networkPanel" class="network-panel">
           <div class="network-status">
             <span class="status-dot" aria-hidden="true"></span>
-            <span id="networkStatus">Checking radio server</span>
+            <span id="networkStatus">Checking local Yachtie</span>
           </div>
           <div class="address-row">
-            <code id="networkAddress">Local radio address</code>
+            <code id="networkAddress">No local address yet</code>
             <button id="copyAddressButton" class="button small" type="button">Copy</button>
           </div>
         </div>
       </section>
 
-      <section class="control-band" aria-label="Radio channel">
+      <section class="control-band" aria-label="Radio setup">
         <label class="field">
           <span>Name</span>
           <input id="nameInput" autocomplete="nickname" enterkeyhint="done" maxlength="40" placeholder="Deckhand" spellcheck="false">
         </label>
-        <label class="field">
-          <span>Radio Channel</span>
-          <input id="roomInput" autocapitalize="none" autocomplete="off" enterkeyhint="done" maxlength="32" placeholder="deck" spellcheck="false">
-        </label>
-        <button id="joinButton" class="button primary" type="button" disabled>Join Channel</button>
+        <div class="field">
+          <span>Channel</span>
+          <div id="roomDisplay" class="channel-lock">Yacht Channel</div>
+        </div>
+        <button id="joinButton" class="button primary" type="button" disabled>Join Yacht Channel</button>
         <button id="leaveButton" class="button ghost" type="button" disabled>Leave</button>
       </section>
 

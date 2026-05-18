@@ -15,7 +15,7 @@
     peerCount: $("peerCount"),
     peerList: $("peerList"),
     remoteAudio: $("remoteAudio"),
-    roomInput: $("roomInput"),
+    roomDisplay: $("roomDisplay"),
     signalPill: $("signalPill"),
     statusText: $("statusText"),
     talkButton: $("talkButton"),
@@ -30,21 +30,21 @@
     micError: "",
     microphonePromise: null,
     name: localStorage.getItem("yachtie-radio-name") || "",
-    networkDetail: "Internet is optional. Crew devices just need this Wi-Fi and the local radio address.",
+    networkDetail: "Internet can be off. Join the yacht Wi-Fi, then open the local Yachtie address shown by the onboard device.",
     networkReady: false,
     networkState: "checking",
-    networkStatus: "Checking radio server",
+    networkStatus: "Checking local Yachtie",
     peers: new Map(),
     pressActive: false,
     radioAddress: getInitialRadioAddress(),
     remoteTalking: new Map(),
-    room: localStorage.getItem("yachtie-radio-room") || "deck",
+    room: "yacht",
     signalError: "",
     transmitting: false
   };
 
   elements.nameInput.value = state.name;
-  elements.roomInput.value = state.room;
+  elements.roomDisplay.textContent = "Yacht Channel";
 
   elements.copyAddressButton.addEventListener("click", copyRadioAddress);
   elements.joinButton.addEventListener("click", joinRadio);
@@ -96,8 +96,8 @@
   async function checkNetworkServer() {
     state.networkReady = false;
     state.networkState = "checking";
-    state.networkStatus = "Checking radio server";
-    state.networkDetail = "Join the yacht Wi-Fi first. Internet is optional.";
+    state.networkStatus = "Checking local Yachtie";
+    state.networkDetail = "Join the yacht Wi-Fi first. Internet can be off.";
     render();
 
     try {
@@ -105,21 +105,21 @@
       const payload = await response.json();
 
       if (!response.ok || !payload || payload.ok !== true) {
-        throw new Error(payload && payload.error ? payload.error : "Local radio server not found.");
+        throw new Error(payload && payload.error ? payload.error : "Local Yachtie is not running here.");
       }
 
       state.radioAddress = chooseRadioAddress(payload.lanUrls);
       state.networkReady = true;
       state.networkState = "ready";
-      state.networkStatus = "Local radio server ready";
+      state.networkStatus = "Local Yachtie ready";
       state.networkDetail = "Crew devices must be on this yacht Wi-Fi. Internet is not required.";
     } catch (error) {
       state.networkReady = false;
       state.networkState = "offline";
-      state.networkStatus = "Onboard radio server needed";
-      state.networkDetail = "Start the local server on the yacht Wi-Fi, then open its LAN address.";
-      state.radioAddress = getInitialRadioAddress();
-      addLog(error.message || "Local radio server not found.");
+      state.networkStatus = "Hosted preview only";
+      state.networkDetail = "To talk onboard, run Yachtie Radio on one device connected to the yacht Wi-Fi. Crew open that device's local address.";
+      state.radioAddress = "";
+      addLog(error.message || "Local Yachtie is not running here.");
     }
 
     render();
@@ -137,7 +137,7 @@
 
   async function copyRadioAddress() {
     if (!state.networkReady || !state.radioAddress) {
-      addLog("Open the onboard LAN radio address first.");
+      addLog("No local yacht address to copy yet.");
       return;
     }
 
@@ -160,22 +160,21 @@
     }
 
     if (!state.networkReady) {
-      addLog("Join the yacht Wi-Fi and open the onboard radio address first.");
+      addLog("Join the yacht Wi-Fi and open the local Yachtie address first.");
       render();
       return;
     }
 
     setBusy(true);
     state.name = normalizeInput(elements.nameInput.value, "Crew");
-    state.room = normalizeInput(elements.roomInput.value, "deck").toLowerCase();
+    state.room = "yacht";
     state.signalError = "";
     localStorage.setItem("yachtie-radio-name", state.name);
-    localStorage.setItem("yachtie-radio-room", state.room);
 
     try {
       connectEvents();
       state.joined = true;
-      addLog(`Joined #${state.room} as ${state.name}`);
+      addLog(`Joined yacht channel as ${state.name}`);
       render();
     } catch (error) {
       addLog(error.message || "Could not join radio");
@@ -245,7 +244,7 @@
       const message = JSON.parse(event.data);
       state.signalError = "";
       state.room = message.room;
-      addLog(`Channel ready: #${state.room}`);
+      addLog("Yacht channel ready");
       render();
     });
 
@@ -627,7 +626,7 @@
     elements.networkPanel.classList.toggle("is-checking", state.networkState === "checking");
     elements.networkStatus.textContent = state.networkStatus;
     elements.networkDetail.textContent = state.networkDetail;
-    elements.networkAddress.textContent = state.radioAddress || "Waiting for LAN address";
+    elements.networkAddress.textContent = state.radioAddress || "No local address yet";
     elements.copyAddressButton.disabled = !state.networkReady || !state.radioAddress;
   }
 
@@ -652,10 +651,10 @@
     elements.joinButton.disabled = state.joined || !state.networkReady;
     elements.leaveButton.disabled = !state.joined;
     elements.nameInput.disabled = state.joined;
-    elements.roomInput.disabled = state.joined;
+    elements.roomDisplay.classList.toggle("is-locked", state.joined);
 
     if (!state.joined && !state.networkReady) {
-      elements.statusText.textContent = state.networkState === "checking" ? "Checking radio server" : "Open onboard radio address";
+      elements.statusText.textContent = state.networkState === "checking" ? "Checking local Yachtie" : "Use local Yachtie address";
       elements.signalPill.textContent = "Wi-Fi";
     } else if (!state.joined) {
       elements.statusText.textContent = "Offline";
@@ -679,7 +678,7 @@
       elements.statusText.textContent = `${remoteTalkers[0].name} is speaking`;
       elements.signalPill.textContent = "RX";
     } else {
-      elements.statusText.textContent = `Listening on #${state.room}`;
+      elements.statusText.textContent = "Listening on yacht channel";
       elements.signalPill.textContent = "Ready";
     }
 
