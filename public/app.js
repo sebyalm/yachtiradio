@@ -3,10 +3,15 @@
 
   const elements = {
     body: document.body,
+    copyAddressButton: $("copyAddressButton"),
     eventLog: $("eventLog"),
     joinButton: $("joinButton"),
     leaveButton: $("leaveButton"),
     nameInput: $("nameInput"),
+    networkAddress: $("networkAddress"),
+    networkDetail: $("networkDetail"),
+    networkPanel: $("networkPanel"),
+    networkStatus: $("networkStatus"),
     peerCount: $("peerCount"),
     peerList: $("peerList"),
     remoteAudio: $("remoteAudio"),
@@ -25,8 +30,13 @@
     micError: "",
     microphonePromise: null,
     name: localStorage.getItem("yachtie-radio-name") || "",
+    networkDetail: "Internet is optional. Crew devices just need this Wi-Fi and the local radio address.",
+    networkReady: false,
+    networkState: "checking",
+    networkStatus: "Checking radio server",
     peers: new Map(),
     pressActive: false,
+    radioAddress: getInitialRadioAddress(),
     remoteTalking: new Map(),
     room: localStorage.getItem("yachtie-radio-room") || "deck",
     signalError: "",
@@ -36,6 +46,7 @@
   elements.nameInput.value = state.name;
   elements.roomInput.value = state.room;
 
+  elements.copyAddressButton.addEventListener("click", copyRadioAddress);
   elements.joinButton.addEventListener("click", joinRadio);
   elements.leaveButton.addEventListener("click", leaveRadio);
   elements.talkButton.addEventListener("pointerdown", beginTransmit);
@@ -63,6 +74,7 @@
   });
 
   render();
+  checkNetworkServer();
 
   function getClientId() {
     const existing = sessionStorage.getItem("yachtie-radio-client-id");
@@ -75,8 +87,81 @@
     return id;
   }
 
+  function getInitialRadioAddress() {
+    return window.location.origin && window.location.origin !== "null"
+      ? window.location.origin
+      : "";
+  }
+
+  async function checkNetworkServer() {
+    state.networkReady = false;
+    state.networkState = "checking";
+    state.networkStatus = "Checking radio server";
+    state.networkDetail = "Join the yacht Wi-Fi first. Internet is optional.";
+    render();
+
+    try {
+      const response = await fetch("/api/health", { cache: "no-store" });
+      const payload = await response.json();
+
+      if (!response.ok || !payload || payload.ok !== true) {
+        throw new Error(payload && payload.error ? payload.error : "Local radio server not found.");
+      }
+
+      state.radioAddress = chooseRadioAddress(payload.lanUrls);
+      state.networkReady = true;
+      state.networkState = "ready";
+      state.networkStatus = "Local radio server ready";
+      state.networkDetail = "Crew devices must be on this yacht Wi-Fi. Internet is not required.";
+    } catch (error) {
+      state.networkReady = false;
+      state.networkState = "offline";
+      state.networkStatus = "Onboard radio server needed";
+      state.networkDetail = "Start the local server on the yacht Wi-Fi, then open its LAN address.";
+      state.radioAddress = getInitialRadioAddress();
+      addLog(error.message || "Local radio server not found.");
+    }
+
+    render();
+  }
+
+  function chooseRadioAddress(lanUrls) {
+    const current = getInitialRadioAddress();
+    const host = String(window.location.hostname || "").toLowerCase();
+    if ((host === "localhost" || host === "127.0.0.1" || host === "::1") && Array.isArray(lanUrls) && lanUrls.length > 0) {
+      return lanUrls[0];
+    }
+
+    return current || (Array.isArray(lanUrls) && lanUrls[0]) || "";
+  }
+
+  async function copyRadioAddress() {
+    if (!state.networkReady || !state.radioAddress) {
+      addLog("Open the onboard LAN radio address first.");
+      return;
+    }
+
+    if (!navigator.clipboard || !navigator.clipboard.writeText) {
+      addLog("Copy is unavailable in this browser.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(state.radioAddress);
+      addLog("Radio address copied");
+    } catch (error) {
+      addLog("Copy failed. Press and hold the address instead.");
+    }
+  }
+
   async function joinRadio() {
     if (state.joined) {
+      return;
+    }
+
+    if (!state.networkReady) {
+      addLog("Join the yacht Wi-Fi and open the onboard radio address first.");
+      render();
       return;
     }
 
@@ -532,8 +617,18 @@
   }
 
   function setBusy(isBusy) {
-    elements.joinButton.disabled = isBusy || state.joined;
+    elements.joinButton.disabled = isBusy || state.joined || !state.networkReady;
     elements.leaveButton.disabled = isBusy || !state.joined;
+  }
+
+  function renderNetwork() {
+    elements.networkPanel.classList.toggle("is-ready", state.networkState === "ready");
+    elements.networkPanel.classList.toggle("is-offline", state.networkState === "offline");
+    elements.networkPanel.classList.toggle("is-checking", state.networkState === "checking");
+    elements.networkStatus.textContent = state.networkStatus;
+    elements.networkDetail.textContent = state.networkDetail;
+    elements.networkAddress.textContent = state.radioAddress || "Waiting for LAN address";
+    elements.copyAddressButton.disabled = !state.networkReady || !state.radioAddress;
   }
 
   function render() {
@@ -542,6 +637,7 @@
       .map(([peerId]) => state.peers.get(peerId))
       .filter(Boolean);
 
+    renderNetwork();
     elements.body.classList.toggle("is-live", state.transmitting || remoteTalkers.length > 0);
     elements.talkButton.classList.toggle("is-transmitting", state.transmitting);
     elements.talkButton.disabled = !state.joined || Boolean(state.signalError);
@@ -553,12 +649,15 @@
         : state.micError
           ? "Try Talk Again"
           : "Hold to Talk";
-    elements.joinButton.disabled = state.joined;
+    elements.joinButton.disabled = state.joined || !state.networkReady;
     elements.leaveButton.disabled = !state.joined;
     elements.nameInput.disabled = state.joined;
     elements.roomInput.disabled = state.joined;
 
-    if (!state.joined) {
+    if (!state.joined && !state.networkReady) {
+      elements.statusText.textContent = state.networkState === "checking" ? "Checking radio server" : "Open onboard radio address";
+      elements.signalPill.textContent = "Wi-Fi";
+    } else if (!state.joined) {
       elements.statusText.textContent = "Offline";
       elements.signalPill.textContent = "LAN";
     } else if (state.transmitting) {

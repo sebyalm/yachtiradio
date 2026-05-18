@@ -1,6 +1,7 @@
 const fs = require("node:fs");
 const http = require("node:http");
 const https = require("node:https");
+const os = require("node:os");
 const path = require("node:path");
 const { URL } = require("node:url");
 
@@ -86,6 +87,41 @@ function clientPublicView(client) {
     name: client.name,
     joinedAt: client.joinedAt
   };
+}
+
+function getHostPort(host) {
+  const value = String(host || "");
+  const ipv6Match = value.match(/^\[[^\]]+\]:(\d+)$/);
+  if (ipv6Match) {
+    return ipv6Match[1];
+  }
+
+  const parts = value.split(":");
+  const port = parts.length > 1 ? parts.at(-1) : "";
+  return /^\d+$/.test(port) ? port : "";
+}
+
+function getLanUrls(req) {
+  const scheme = req.socket && req.socket.encrypted ? "https" : "http";
+  const port = getHostPort(req.headers.host) || String(DEFAULT_PORT);
+  const urls = [];
+  const seen = new Set();
+
+  for (const interfaces of Object.values(os.networkInterfaces())) {
+    for (const item of interfaces || []) {
+      if (item.family !== "IPv4" || item.internal || !item.address) {
+        continue;
+      }
+
+      const url = `${scheme}://${item.address}:${port}`;
+      if (!seen.has(url)) {
+        seen.add(url);
+        urls.push(url);
+      }
+    }
+  }
+
+  return urls;
 }
 
 function createApp({ publicDir = PUBLIC_DIR } = {}) {
@@ -262,6 +298,7 @@ function createApp({ publicDir = PUBLIC_DIR } = {}) {
     if (req.method === "GET" && requestUrl.pathname === "/api/health") {
       sendJson(res, 200, {
         ok: true,
+        lanUrls: getLanUrls(req),
         rooms: Array.from(rooms.values()).map((room) => ({
           name: room.name,
           peers: room.clients.size
@@ -320,6 +357,7 @@ if (require.main === module) {
 module.exports = {
   createApp,
   createServer,
+  getLanUrls,
   sanitizeRoom,
   sanitizeText
 };

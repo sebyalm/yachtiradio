@@ -43,7 +43,10 @@ test("serves the app shell and health endpoint", async (t) => {
 
   const health = await fetch(`${baseUrl}/api/health`);
   assert.equal(health.status, 200);
-  assert.deepEqual(await health.json(), { ok: true, rooms: [] });
+  const healthBody = await health.json();
+  assert.equal(healthBody.ok, true);
+  assert.deepEqual(healthBody.rooms, []);
+  assert.ok(Array.isArray(healthBody.lanUrls));
 
   const appScript = await fetch(`${baseUrl}/app.js?v=test`);
   assert.equal(appScript.status, 200);

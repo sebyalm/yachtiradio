@@ -10,9 +10,15 @@ The app uses a tiny local Node server for peer discovery and WebRTC signaling. V
 npm start
 ```
 
-Open `http://localhost:3000` on the host machine.
+Open `http://localhost:3000` on the host machine. The app will show the LAN radio address that crew devices should open.
 
-For phones on the same Wi-Fi network, open:
+Crew flow:
+
+1. Join the yacht Wi-Fi in the device's normal Wi-Fi settings. Internet is not required.
+2. Open the local radio address shown by the onboard server.
+3. Join a radio channel and hold to talk.
+
+For phones on the same Wi-Fi network, the address looks like:
 
 ```text
 http://<host-lan-ip>:3000
@@ -38,7 +44,7 @@ Then open `https://<host-lan-ip>:3000`.
 
 ## Vercel Hosting
 
-Vercel can host the static web UI, but it cannot replace the onboard LAN signaling server. The deployed Vercel URL is useful as a preview that the app shell loads. For actual radio behavior, run `npm start` on a computer connected to the yacht Wi-Fi and open that LAN address from crew devices.
+Vercel can host the static web UI, but it cannot replace the onboard LAN signaling server. The deployed Vercel URL is useful as a preview that the app shell loads. For actual radio behavior, run `npm start` on a computer connected to the yacht Wi-Fi and open that LAN address from crew devices. The app blocks channel join when it detects that only the static preview is available.
 
 ## Reality Check
 

@@ -86,12 +86,17 @@ function createElement(tagName = "div") {
   return element;
 }
 
-function createHarness({ fetch, getUserMedia }) {
+function createHarness({ fetch, getUserMedia, healthOk = true, healthPayload }) {
   const ids = [
+    "copyAddressButton",
     "eventLog",
     "joinButton",
     "leaveButton",
     "nameInput",
+    "networkAddress",
+    "networkDetail",
+    "networkPanel",
+    "networkStatus",
     "peerCount",
     "peerList",
     "remoteAudio",
@@ -121,6 +126,29 @@ function createHarness({ fetch, getUserMedia }) {
     }
   }
 
+  const defaultHealth = healthPayload || {
+    ok: true,
+    lanUrls: ["http://192.168.50.10:3000"],
+    rooms: []
+  };
+  const fetchImpl = (url, options) => {
+    if (String(url).includes("/api/health")) {
+      return Promise.resolve({
+        ok: healthOk,
+        json: () => Promise.resolve(defaultHealth)
+      });
+    }
+
+    if (fetch) {
+      return fetch(url, options);
+    }
+
+    return Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({})
+    });
+  };
+
   const context = {
     EventSource: EventSourceMock,
     RTCPeerConnection: class {},
@@ -134,9 +162,12 @@ function createHarness({ fetch, getUserMedia }) {
         return elements[id];
       }
     },
-    fetch: fetch || (() => Promise.resolve({ ok: true })),
+    fetch: fetchImpl,
     localStorage: storage(),
     navigator: {
+      clipboard: {
+        writeText: () => Promise.resolve()
+      },
       mediaDevices: {
         getUserMedia
       }
@@ -160,11 +191,34 @@ function createHarness({ fetch, getUserMedia }) {
   return { context, elements, EventSourceMock };
 }
 
+async function flushAsync() {
+  await Promise.resolve();
+  await Promise.resolve();
+  await new Promise((resolve) => setImmediate(resolve));
+}
+
+test("hosted preview blocks channel join until the local radio server is available", async () => {
+  const { elements, EventSourceMock } = createHarness({
+    healthPayload: {
+      error: "The hosted preview only serves the static app."
+    },
+    getUserMedia: () => Promise.resolve()
+  });
+
+  await flushAsync();
+  assert.equal(elements.networkStatus.textContent, "Onboard radio server needed");
+  assert.equal(elements.joinButton.disabled, true);
+
+  elements.joinButton.listeners.get("click")();
+  assert.equal(EventSourceMock.instances.length, 0);
+});
+
 test("join enters the channel even when microphone permission stalls", async () => {
   const { elements, EventSourceMock } = createHarness({
     getUserMedia: () => new Promise(() => {})
   });
 
+  await flushAsync();
   elements.nameInput.value = "Alice";
   elements.roomInput.value = "Deck";
   elements.joinButton.listeners.get("click")();
@@ -184,6 +238,7 @@ test("holding talk reports microphone failures instead of falling back to listen
     getUserMedia: () => Promise.reject(error)
   });
 
+  await flushAsync();
   elements.nameInput.value = "Alice";
   elements.roomInput.value = "Deck";
   await elements.joinButton.listeners.get("click")();
@@ -203,7 +258,10 @@ test("holding talk enables the microphone track and sends a talking signal", asy
   const { elements } = createHarness({
     fetch: (url, options) => {
       fetchCalls.push({ url, options });
-      return Promise.resolve({ ok: true });
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({})
+      });
     },
     getUserMedia: () => Promise.resolve({
       getAudioTracks: () => [track],
@@ -211,6 +269,7 @@ test("holding talk enables the microphone track and sends a talking signal", asy
     })
   });
 
+  await flushAsync();
   elements.nameInput.value = "Alice";
   elements.roomInput.value = "Deck";
   await elements.joinButton.listeners.get("click")();
